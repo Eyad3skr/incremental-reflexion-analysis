@@ -50,7 +50,7 @@ tests/
 
 ## 2. Phase Breakdown
 
-### Phase 0 — In-Memory Engine (Now)
+### Phase 0 - In-Memory Engine (Now)
 
 **Goal:**
 - Build the `ReflexionGraph`
@@ -64,7 +64,7 @@ tests/
 
 ---
 
-### Phase 1 — IR JSON Formats
+### Phase 1 - IR JSON Formats
 
 Define JSON for the engine:
 
@@ -101,7 +101,7 @@ Serde structs will be defined in `io/json_loader.rs`.
 
 ---
 
-### Phase 2 — Normalizer (JSON → ReflexionGraph)
+### Phase 2 - Normalizer (JSON → ReflexionGraph)
 
 Implement:
 
@@ -115,7 +115,7 @@ This prepares the internal graph representation for the core engine.
 
 ---
 
-### Phase 3 — Hierarchy-Aware Lifting
+### Phase 3 - Hierarchy-Aware Lifting
 
 - Walk parent/ancestor nodes during lifting
 - Add `AllowedAbsent`, `ImplicitlyAllowed`
@@ -124,7 +124,7 @@ This prepares the internal graph representation for the core engine.
 
 ---
 
-### Phase 4 — Incremental API
+### Phase 4 - Incremental API
 
 Expose:
 
@@ -138,7 +138,7 @@ So editors (LSP), CI watchers, and SEE can update results in real time.
 
 ---
 
-### Phase 5 — Contract Attributes (SpecScript Integration)
+### Phase 5 - Contract Attributes (SpecScript Integration)
 
 Architecture edges and nodes can declare:
 - `optional`
@@ -151,7 +151,7 @@ The engine classifies violations using these constraints.
 
 ---
 
-### Phase 6 — Mapping Rules (from SpecScript)
+### Phase 6 - Mapping Rules (from SpecScript)
 
 SpecScript compiler emits:
 
@@ -170,7 +170,7 @@ Stops relying on `mapping.json`.
 
 ---
 
-### Phase 7 — CLI Tooling
+### Phase 7 - CLI Tooling
 
 Binary name example:
 
@@ -188,7 +188,7 @@ CLI performs:
 
 ---
 
-### Phase 8 — IDE & CI Integration
+### Phase 8 - IDE & CI Integration
 
 Expose:
 - JSON reports
@@ -226,7 +226,7 @@ The full SpecScript + Reflexion Engine pipeline works as follows:
 
 An architect writes a `.specscript` specification describing the intended architecture (layers, services, datastores, allowed and forbidden dependencies, styles, mapping rules, and data-access policies). The SpecScript parser converts this into a `SystemSpec` AST, and the SpecScript compiler turns that AST into engine-ready JSON IR consisting of `ArchitectureModel`, `MappingRules`, and `ContractSet`. 
 
-In parallel, language-specific extractors analyze the actual codebase and produce `ImplementationFacts` (implementation nodes and dependency edges). The normalizer merges these two inputs—architecture IR and implementation facts—into a `ReflexionGraph`, applying mapping rules to associate code elements with their architectural roles. 
+In parallel, language-specific extractors analyze the actual codebase and produce `ImplementationFacts` (implementation nodes and dependency edges). The normalizer merges these two inputs—architecture IR and implementation facts into a `ReflexionGraph`, applying mapping rules to associate code elements with their architectural roles. 
 
 The core Reflexion Engine then initializes edge states, propagates implementation edges into the architectural space, lifts them against declared architecture edges, and classifies every edge as Convergent, Divergent, Allowed, Absent, AllowedAbsent, ImplicitlyAllowed, or Unmapped, taking into account SpecScript contracts such as forbidden, optional, must-exist edges, and style rules. 
 
