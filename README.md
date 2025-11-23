@@ -1,34 +1,50 @@
 # Reflexion Engine (Rust) — Architecture, Phases & Project Plan
 
-This document describes the **Rust Reflexion Engine** that will become the core structural conformance checker under **ArDSL** (Architecture-as-Code).
+This document describes the **Rust Reflexion Engine** that will become the core structural conformance checker under **SpecScript** (Architecture-as-Code).
 
-The engine is heavily inspired by Koschke's original Reflexion Model but modernized, made incremental, and designed for full integration with ArDSL.
+The engine is heavily inspired by Prof. Koschke's original Reflexion Model but modernized, made incremental, and designed for full integration with SpecScript.
 
 ---
 
 ## 1. Repository Structure
 
 ```
-reflexion-core/
-├── Cargo.toml
-├── src/
-│   ├── lib.rs
-│   ├── model.rs        # graph IR types (Node, Edge, ReflexionGraph)
-│   ├── engine.rs       # reflexion algorithm (propagate, lift)
-│   # later:
-│   # io.rs             # JSON IR serialization/deserialization
-│   # normalizer.rs     # IR JSON → ReflexionGraph
-└── tests/
-    └── basic.rs        # tiny hardcoded example test
+src/
+  core/
+    graph.rs            # nodes, edges, IR
+    classify.rs         # classification logic
+    delta.rs            # incremental diffs
+    lifting.rs          # lifting/hierarchy logic
+    propagate.rs        # propagation logic
+    mapping.rs          # maps_to + rule-based mapping
+    state.rs            # Convergent, Divergent, etc.
+    types.rs            # enums + shared types
+
+  io/
+    json_loader.rs
+    json_writer.rs
+    normalize.rs        # JSON → ReflexionGraph
+    ardsl_loader.rs     # .ardsl compiler input
+
+  ardsl/
+    parser.rs           # lexer/parser for DSL
+    model.rs            # DSL AST
+    compiler.rs         # AST → JSON IR
+    patterns.rs         # style/pattern rules
+    policies.rs         # optional/forbidden/etc.
+
+  cli/
+    main.rs
+    commands.rs         # support multiple commands
+    args.rs
+
+tests/
+  simple_layered.rs
+  mismatch_examples.rs
+  incremental.rs
+
 ```
 
-Later, I will create:
-
-```
-reflexion-cli/
-└── src/
-    └── main.rs         # CLI wrapper around reflexion-core
-```
 
 ---
 
