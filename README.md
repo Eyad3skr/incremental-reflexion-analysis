@@ -1,4 +1,4 @@
-# SpecScript — Executable Architecture Contracts
+# SpecScript | Executable Architecture Contracts
 
 SpecScript is a declarative DSL and analysis engine for enforcing
 software architecture rules directly against your codebase. Inspired
