@@ -2,7 +2,7 @@
 
 SpecScript is a declarative DSL and analysis engine for enforcing
 software architecture rules directly against your codebase. Inspired
-by Reflexion Models (Murphy & Notkin), SpecScript turns architecture
+by Incremental Reflexion Analysis (Prof. Rainer Koschke), SpecScript turns architecture
 into an executable artifact with deterministic, explainable conformance
 results.
 
