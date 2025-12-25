@@ -128,6 +128,63 @@ impl ReflexionGraph {
 
         Ok(id)
     }
+
+    //Prepare the graph for a fresh reflexion analysis and run:
+    // - Arch edges: Specified, Counter=0
+    // - Impl edges: Undefined, Counter=0
+    // - Propagated edges: Undefined, Counter=0
+    // - Propagation_table cleared
+    pub fn init_states(&mut self) {
+        for edge in self.edges.values_mut() {
+
+            edge.counter = 0;
+
+            match edge.subgraph {
+                SubgraphKind::Architecture => {
+                    edge.state = EdgeState::Specified;
+                }
+                SubgraphKind::Implementation | SubgraphKind::Propagated => {
+                    edge.state = EdgeState::Undefined;
+                }
+            }
+        }
+        self.propagation_table.clear();
+    }
+
+    // Optional helper for future incremental modes:
+    // remove all propagated edges from the graph.
+    //
+    // NOTE: This intentionally only removes edges and their adjacency references
+    // for impl_out/arch_out. If you later add more adjacency indexes, update here too.
+    pub fn clear_propagated_edges(&mut self) {
+        // collect first to avoid borrowing issues while removing
+        let to_remove: Vec<EdgeId> = self
+            .edges
+            .iter()
+            .filter_map(|(id, e)| {
+                if matches!(e.subgraph, SubgraphKind::Propagated) {
+                    Some(*id)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for eid in to_remove {
+            if let Some(e) = self.edges.remove(&eid) {
+                // remove from adjacency lists
+                if let Some(v) = self.impl_out.get_mut(&e.from) {
+                    v.retain(|&x| x != eid);
+                }
+                if let Some(v) = self.arch_out.get_mut(&e.from) {
+                    v.retain(|&x| x != eid);
+                }
+
+                // remove any propagation bookkeeping referencing this edge id
+                self.propagation_table.remove(&eid);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -135,6 +192,7 @@ mod tests {
     use super::*;
     use crate::core::types::{EdgeKind, SubgraphKind};
     use crate::core::state::EdgeState;
+    use std::collections::{HashMap, HashSet};
 
     fn mk_node(name: &str, subgraph: SubgraphKind, parent: Option<NodeId>) -> Node {
         Node {
@@ -228,4 +286,79 @@ mod tests {
 
         assert_eq!(err, GraphError::NodeNotFound(999));
     }
+
+
+    #[test]
+    fn init_states_resets_edge_states_counters_and_clears_propagation_table() {
+        // Build a tiny graph in "post-run" messy state
+        let mut g = ReflexionGraph::new();
+
+        let n1: NodeId = 1;
+        let n2: NodeId = 2;
+
+        let e_arch: EdgeId = 10;
+        let e_impl: EdgeId = 11;
+        let e_prop: EdgeId = 12;
+
+        g.edges.insert(
+            e_arch,
+            Edge {
+                id: e_arch,
+                from: n1,
+                to: n2,
+                kind: EdgeKind::depends_on(),
+                subgraph: SubgraphKind::Architecture,
+                state: EdgeState::Undefined, // wrong on purpose
+                counter: 7,                  // wrong on purpose
+            },
+        );
+
+        g.edges.insert(
+            e_impl,
+            Edge {
+                id: e_impl,
+                from: n1,
+                to: n2,
+                kind: EdgeKind::depends_on(),
+                subgraph: SubgraphKind::Implementation,
+                state: EdgeState::Specified, // wrong on purpose
+                counter: 9,                  // wrong on purpose
+            },
+        );
+
+        g.edges.insert(
+            e_prop,
+            Edge {
+                id: e_prop,
+                from: n1,
+                to: n2,
+                kind: EdgeKind::depends_on(),
+                subgraph: SubgraphKind::Propagated,
+                state: EdgeState::Specified, // wrong on purpose
+                counter: 3,                  // wrong on purpose
+            },
+        );
+
+        // Fake leftover propagation table entries from a previous run
+        g.propagation_table.insert(e_prop, HashSet::new());
+
+        // Act
+        g.init_states();
+
+        // Assert
+        let a = g.edges.get(&e_arch).unwrap();
+        assert!(matches!(a.state, EdgeState::Specified));
+        assert_eq!(a.counter, 0);
+
+        let i = g.edges.get(&e_impl).unwrap();
+        assert!(matches!(i.state, EdgeState::Undefined));
+        assert_eq!(i.counter, 0);
+
+        let p = g.edges.get(&e_prop).unwrap();
+        assert!(matches!(p.state, EdgeState::Undefined));
+        assert_eq!(p.counter, 0);
+
+        assert!(g.propagation_table.is_empty());
+    }
+
 }
