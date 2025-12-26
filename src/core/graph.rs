@@ -8,13 +8,49 @@ use crate::core::state::EdgeState;
 pub enum GraphError {
     ParentNotFound(NodeId),
     NodeNotFound(NodeId),
+    WrongSubgraph { node: NodeId, expected: SubgraphKind, found: SubgraphKind },
+    MappingAlreadyExists { impl_node: NodeId, old_arch: NodeId, new_arch: NodeId },
+    ImplNodeAlreadyMapped(NodeId),
 }
 
 impl fmt::Display for GraphError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            GraphError::ParentNotFound(id) => write!(f, "Parent node not found: {}", id),
-            GraphError::NodeNotFound(id) => write!(f, "Node not found: {}", id),
+            GraphError::ParentNotFound(id) => {
+                write!(f, "Parent node not found (node id = {})", id)
+            }
+
+            GraphError::NodeNotFound(id) => {
+                write!(f, "Node not found (node id = {})", id)
+            }
+
+            GraphError::WrongSubgraph { node, expected, found } => {
+                write!(
+                    f,
+                    "Node {} is in wrong subgraph: expected {:?}, found {:?}",
+                    node, expected, found
+                )
+            }
+
+            GraphError::MappingAlreadyExists {
+                impl_node,
+                old_arch,
+                new_arch,
+            } => {
+                write!(
+                    f,
+                    "Implementation node {} is already mapped to architecture node {}; cannot remap to {}",
+                    impl_node, old_arch, new_arch
+                )
+            }
+
+            GraphError::ImplNodeAlreadyMapped(impl_node) => {
+                write!(
+                    f,
+                    "Implementation node {} is already mapped",
+                    impl_node
+                )
+            }
         }
     }
 }
@@ -27,6 +63,19 @@ pub struct Node {
     subgraph: SubgraphKind,
     parent: Option<NodeId>,
     children: Vec<NodeId>,
+}
+
+
+impl Node {
+    pub(crate) fn new(name: impl Into<String>, subgraph: SubgraphKind, parent: Option<NodeId>) -> Self {
+        Self {
+            id: 0, // overwritten by add_node
+            name: name.into(),
+            subgraph,
+            parent,
+            children: vec![],
+        }
+    }
 }
 
 pub struct Edge {
@@ -44,7 +93,7 @@ pub struct ReflexionGraph {
     edges: HashMap<EdgeId, Edge>,
     impl_out: HashMap<NodeId, Vec<EdgeId>>,
     arch_out: HashMap<NodeId, Vec<EdgeId>>,
-    maps_to: HashMap<NodeId, NodeId>,
+    pub maps_to: HashMap<NodeId, NodeId>,
     propagation_table: HashMap<EdgeId, HashSet<EdgeId>>, //arc/propagated edge -> impl edges
     next_node_id: NodeId,
     next_edge_id: EdgeId,
@@ -62,6 +111,13 @@ impl ReflexionGraph {
             next_node_id: 1, 
             next_edge_id: 1,
         }
+    }
+
+    pub fn node_subgraph(&self, node: NodeId) -> Result<SubgraphKind, GraphError> {
+        self.nodes
+            .get(&node)
+            .map(|n| n.subgraph)
+            .ok_or(GraphError::NodeNotFound(node))
     }
 
     pub fn fresh_node_id(&mut self) -> NodeId {
