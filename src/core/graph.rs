@@ -1,11 +1,12 @@
 // nodes, edges, IR 
 use std::collections::{HashMap, HashSet};
-use std::fmt::{self, write};
-use crate::core::types::{NodeId, EdgeId, Counter, SubgraphKind, EdgeKind, NodeKind};
+use std::fmt;
+use crate::core::types::{NodeId, EdgeId, Counter, SubgraphKind, EdgeKind};
 use crate::core::state::EdgeState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GraphError {
+    EdgeNotFound(EdgeId), 
     ParentNotFound(NodeId),
     NodeNotFound(NodeId),
     WrongSubgraph { node: NodeId, expected: SubgraphKind, found: SubgraphKind },
@@ -13,17 +14,16 @@ pub enum GraphError {
     ImplNodeAlreadyMapped(NodeId),
 }
 
+
 impl fmt::Display for GraphError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             GraphError::ParentNotFound(id) => {
                 write!(f, "Parent node not found (node id = {})", id)
             }
-
             GraphError::NodeNotFound(id) => {
                 write!(f, "Node not found (node id = {})", id)
             }
-
             GraphError::WrongSubgraph { node, expected, found } => {
                 write!(
                     f,
@@ -31,25 +31,18 @@ impl fmt::Display for GraphError {
                     node, expected, found
                 )
             }
-
-            GraphError::MappingAlreadyExists {
-                impl_node,
-                old_arch,
-                new_arch,
-            } => {
+            GraphError::MappingAlreadyExists { impl_node, old_arch, new_arch } => {
                 write!(
                     f,
                     "Implementation node {} is already mapped to architecture node {}; cannot remap to {}",
                     impl_node, old_arch, new_arch
                 )
             }
-
             GraphError::ImplNodeAlreadyMapped(impl_node) => {
-                write!(
-                    f,
-                    "Implementation node {} is already mapped",
-                    impl_node
-                )
+                write!(f, "Implementation node {} is already mapped", impl_node)
+            }
+            GraphError::EdgeNotFound(id) => {
+                write!(f, "Edge not found (edge id = {})", id)
             }
         }
     }
@@ -79,24 +72,24 @@ impl Node {
 }
 
 pub struct Edge {
-    id: EdgeId,
-    from: NodeId,
-    to: NodeId,
-    kind: EdgeKind,
-    subgraph: SubgraphKind,
-    state: EdgeState,
-    counter: Counter,
+    pub(crate) id: EdgeId,
+    pub(crate) from: NodeId,
+    pub(crate) to: NodeId,
+    pub(crate) kind: EdgeKind,
+    pub(crate) subgraph: SubgraphKind,
+    pub(crate) state: EdgeState,
+    pub(crate) counter: Counter,
 }
 
 pub struct ReflexionGraph {
-    nodes: HashMap<NodeId, Node>,
-    edges: HashMap<EdgeId, Edge>,
-    impl_out: HashMap<NodeId, Vec<EdgeId>>,
-    arch_out: HashMap<NodeId, Vec<EdgeId>>,
+    pub(crate) nodes: HashMap<NodeId, Node>,
+    pub(crate) edges: HashMap<EdgeId, Edge>,
+    pub(crate) impl_out: HashMap<NodeId, Vec<EdgeId>>,
+    pub(crate) arch_out: HashMap<NodeId, Vec<EdgeId>>,
     pub maps_to: HashMap<NodeId, NodeId>,
-    propagation_table: HashMap<EdgeId, HashSet<EdgeId>>, //arc/propagated edge -> impl edges
-    next_node_id: NodeId,
-    next_edge_id: EdgeId,
+    pub(crate) propagation_table: HashMap<EdgeId, HashSet<EdgeId>>,
+    pub(crate) next_node_id: NodeId,
+    pub(crate) next_edge_id: EdgeId,
 }
 
 impl ReflexionGraph {
@@ -134,8 +127,10 @@ impl ReflexionGraph {
 
     pub fn add_node(&mut self, mut node: Node) -> Result<NodeId, GraphError> {
         //if parent is specified, it must already exist
-        if let Some(parent_id) = node.parent && !self.nodes.contains_key(&parent_id) {
-            return Err(GraphError::ParentNotFound(parent_id));
+        if let Some(parent_id) = node.parent {
+            if !self.nodes.contains_key(&parent_id) {
+                return Err(GraphError::ParentNotFound(parent_id));
+            }
         }
 
         //now graph owns identity, assign fresh IDs
@@ -416,5 +411,4 @@ mod tests {
 
         assert!(g.propagation_table.is_empty());
     }
-
 }

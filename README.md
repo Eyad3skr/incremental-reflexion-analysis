@@ -18,26 +18,168 @@ results.
 ## Example
 
 ```specscript
-system "ProLancer" {
-  structure {
-    layer Application {
-      component TaskService
-      component ProjectService
-    }
-    layer Infrastructure {
-      component DBAdapter
-    }
-  }
+system "ExampleSystem" {
+      repo_root "./"
+      languages ["typescript", "java"]
 
-  contracts {
-    forbid Application -> Infrastructure
-  }
 
-  mapping {
-    "src/app/**" -> Application
-    "src/infra/**" -> Infrastructure
-  }
+    // =======================
+    // 1) Architecture model
+    // =======================
+    architecture {
+
+      // High-level components (logical architecture)
+      component UI
+      component Application
+      component Domain
+      component Infrastructure
+
+      // Optional hierarchy
+      component Application {
+        component UseCases
+        component Services
+      }
+
+      component Infrastructure {
+        component Persistence
+        component Messaging
+      }
+
+      // Dependency kinds the engine understands
+      allowed_kinds [depends_on, calls]
+    }
+
+
+    // ====================================
+    // 2) Architectural rules (the contract)
+    // ====================================
+    rules {
+
+      // Layering rules
+      allow UI -> Application
+      allow Application -> Domain
+      allow Application -> Infrastructure
+
+      // Forbidden dependencies
+      forbid UI -> Domain
+      forbid UI -> Infrastructure
+      forbid Domain -> Infrastructure
+
+      // No upward dependencies
+      forbid Domain -> Application
+      forbid Domain -> UI
+    }
+
+
+    // ====================================
+    // 3) Mapping rules (impl → arch)
+    // ====================================
+    mapping {
+
+      // ---------- Manual pins (highest priority)
+      manual {
+        "src/main/ui/LoginPage.tsx"      -> UI
+        "src/main/app/AuthService.ts"    -> Application.Services
+      }
+
+      // ---------- Path-based rules
+      rule path_prefix {
+        match "src/main/ui/"
+        maps_to UI
+        priority 100
+      }
+
+      rule path_prefix {
+        match "src/main/app/"
+        maps_to Application
+        priority 90
+      }
+
+      rule path_prefix {
+        match "src/main/domain/"
+        maps_to Domain
+        priority 80
+      }
+
+      rule path_prefix {
+        match "src/main/infra/"
+        maps_to Infrastructure
+        priority 70
+      }
+
+      // ---------- Regex-based rules
+      rule regex {
+        match ".*Controller.*"
+        maps_to UI
+        priority 60
+      }
+
+      rule regex {
+        match ".*Service.*"
+        maps_to Application.Services
+        priority 50
+      }
+
+      rule regex {
+        match ".*Repository.*"
+        maps_to Infrastructure.Persistence
+        priority 40
+      }
+
+      // ---------- Fallback
+      unmatched {
+        mark unmapped
+        report true
+      }
+    }
+
+
+    // ====================================
+    // 4) Enforcement configuration
+    // ====================================
+    enforcement {
+
+      // How strict the check is
+      on_unmapped_impl_nodes warn
+      on_forbidden_dependency error
+
+      // Fail CI if violations exist
+      fail_on_error true
+    }
+
 }
+```
+## Full Flow 
+```
+dsl/
+   └── **Input:** user writes architecture spec (components, layers, allowed deps) and mapping rules
+       **Output:** compiled typed artifacts (spec.toon, mapping_rules.toon)
+
+extractors/ (TS/Rust/Java)
+   └── produce facts.toon  (impl nodes + impl edges + metadata)
+
+formats/ + io/
+   └── load facts.toon, spec.toon, mapping_rules.toon, manual_mappings.toon
+
+mapping/
+   └── generate maps_to + unmapped + mapping_trace
+
+core/
+   └── run reflexion:
+        init_states()
+        clear_propagated_edges()
+        propagate()
+        lift()
+        classify()
+        incremental recompute skeleton()
+
+report/
+   └── pretty report + JSON + DOT graph
+
+cli/
+   └── specscript check --spec spec.toon --facts facts.toon
+       (and optional --mapping-rules / --manual-mapping / --dot / --json)
+
 ```
 ## End-to-End SpecScript + Engine Pipeline
 
