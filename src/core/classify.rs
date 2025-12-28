@@ -65,7 +65,11 @@ mod tests {
     use super::*;
     use crate::core::graph::{Edge, Node, ReflexionGraph};
     use crate::core::state::EdgeState;
-    use crate::core::types::{EdgeKind, SubgraphKind};
+    use crate::core::types::{EdgeKind, NodeId, SubgraphKind};
+
+    fn mk_node(name: &str, subgraph: SubgraphKind, parent: Option<NodeId>) -> Node {
+        Node::new(name.to_string(), subgraph, parent)
+    }
 
     fn mk_edge(from: u32, to: u32, subgraph: SubgraphKind, kind: EdgeKind) -> Edge {
         Edge {
@@ -140,6 +144,108 @@ mod tests {
 
         //optional: violations count == 0
         assert_eq!(g.count_violations(), 0);
+    }
+
+    ///scenario 1: Missing implementation edge
+    ///architecture has UI -> Service specified, but impl has no corresponding edge.
+    ///expected: arch edge becomes Absent after run_from_scratch().
+    #[test]
+    fn mismatch_missing_impl_edge_marks_arch_absent() {
+        let mut g = ReflexionGraph::new();
+
+        let ui = g.add_node(mk_node("UI", SubgraphKind::Architecture, None)).unwrap();
+        let service = g
+            .add_node(mk_node("Service", SubgraphKind::Architecture, None))
+            .unwrap();
+
+        let e_arch = g
+            .add_edge(mk_edge(ui, service, SubgraphKind::Architecture, EdgeKind::depends_on()))
+            .unwrap();
+
+        //no impl edges at all
+        g.run_from_scratch();
+
+        let arch_e = g.edges.get(&e_arch).unwrap();
+        assert!(matches!(arch_e.state, EdgeState::Absent));
+        assert_eq!(arch_e.counter, 0);
+    }
+
+    ///scenario 2: Divergent dependency
+    ///architecture specifies only UI -> Service.
+    ///implementation produces UI -> DB (mapped), which is not specified.
+    ///expected: impl edge becomes Divergent after propagate_and_lift during run_from_scratch().
+    #[test]
+    fn mismatch_divergent_impl_edge_is_marked_divergent() {
+        let mut g = ReflexionGraph::new();
+
+        //arch nodes
+        let ui = g.add_node(mk_node("UI", SubgraphKind::Architecture, None)).unwrap();
+        let service = g
+            .add_node(mk_node("Service", SubgraphKind::Architecture, None))
+            .unwrap();
+        let db = g.add_node(mk_node("DB", SubgraphKind::Architecture, None)).unwrap();
+
+        //only specified edge: UI -> Service
+        let _e_arch = g
+            .add_edge(mk_edge(ui, service, SubgraphKind::Architecture, EdgeKind::depends_on()))
+            .unwrap();
+
+        //impl nodes
+        let login = g
+            .add_node(mk_node("LoginPage", SubgraphKind::Implementation, None))
+            .unwrap();
+        let db_impl = g
+            .add_node(mk_node("DBClient", SubgraphKind::Implementation, None))
+            .unwrap();
+
+        //mapping: LoginPage -> UI, DBClient -> DB
+        g.set_mapping_overwrite(login, ui);
+        g.set_mapping_overwrite(db_impl, db);
+
+        //impl edge: LoginPage -> DBClient (mapped to UI -> DB), which is NOT specified
+        let e_impl = g
+            .add_edge(mk_edge(
+                login,
+                db_impl,
+                SubgraphKind::Implementation,
+                EdgeKind::depends_on(),
+            ))
+            .unwrap();
+
+        g.run_from_scratch();
+
+        let impl_e = g.edges.get(&e_impl).unwrap();
+        assert!(matches!(impl_e.state, EdgeState::Divergent));
+    }
+
+    ///scenario 3: Unmapped implementation edge
+    ///impl edge endpoints have no maps_to entries.
+    //expected: impl edge becomes Unmapped, and propagation does nothing.
+    #[test]
+    fn mismatch_unmapped_impl_edge_marks_unmapped() {
+        let mut g = ReflexionGraph::new();
+
+        // Impl nodes (no mappings)
+        let a = g
+            .add_node(mk_node("A_Impl", SubgraphKind::Implementation, None))
+            .unwrap();
+        let b = g
+            .add_node(mk_node("B_Impl", SubgraphKind::Implementation, None))
+            .unwrap();
+
+        let e_impl = g
+            .add_edge(mk_edge(
+                a,
+                b,
+                SubgraphKind::Implementation,
+                EdgeKind::depends_on(),
+            ))
+            .unwrap();
+
+        g.run_from_scratch();
+
+        let impl_e = g.edges.get(&e_impl).unwrap();
+        assert!(matches!(impl_e.state, EdgeState::Unmapped));
     }
 }
 

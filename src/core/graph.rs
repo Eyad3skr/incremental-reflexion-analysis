@@ -51,7 +51,7 @@ impl fmt::Display for GraphError {
 impl std::error::Error for GraphError{} 
 
 pub struct Node {
-    id: NodeId,
+     id: NodeId,
     name: String,
     subgraph: SubgraphKind,
     parent: Option<NodeId>,
