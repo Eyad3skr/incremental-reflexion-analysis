@@ -1,4 +1,4 @@
-# Reflexion Analysis Prototype (Rust)
+# Incremental Reflexion Analysis Prototype (Rust)
 
 This repository contains a **small, exploratory Rust prototype** for studying the core semantics of **incremental reflexion analysis**, inspired by the work of Prof. Rainer Koschke.
 
