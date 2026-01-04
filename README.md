@@ -1,6 +1,6 @@
 # Incremental Reflexion Analysis Prototype (Rust)
 
-This repository contains a **small, exploratory Rust prototype** for studying the core semantics of **incremental reflexion analysis**, inspired by the work of Prof. Rainer Koschke.
+This repository contains a **small, exploratory Rust prototype** for studying the core semantics of **incremental reflexion analysis**, inspired by the [paper](https://onlinelibrary.wiley.com/doi/10.1002/smr.542) of Prof. Rainer Koschke.
 
 The project is intended purely as a **learning and research exercise** to better understand how mapping, propagation, lifting, and classification interact at a semantic level.
 
